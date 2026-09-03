@@ -8,3 +8,4 @@ dbt_project/logs/
 dbt_project/dbt_packages/
 .streamlit/
 .DS_Store
+dbt_project/.user.yml

@@ -2,11 +2,30 @@ version: 2
 
 models:
   - name: fct_daily_revenue
-    description: Daily completed-order revenue for the CEO dashboard.
+    description: >
+      Daily completed-order revenue for the CEO dashboard. One row per calendar
+      day. Guarded against SCD fan-out from the customer dimension.
     columns:
       - name: order_date
+        description: Calendar day of the order (from stg_orders.created_at).
+        data_tests:
+          # One row per day is the grain of this mart. Note that `unique` alone
+          # cannot catch revenue inflation - the GROUP BY collapses a fanned-out
+          # join back to one row per day - which is why the singular test and the
+          # unit test below exist as well.
+          - not_null
+          - unique
+
+      - name: completed_order_rows
+        description: >
+          Number of completed order rows contributing to the day. Compared
+          against the source count by tests/assert_revenue_matches_orders.sql:
+          if the customer join fans out, this rises while stg_orders has not
+          changed at all.
         data_tests:
           - not_null
+
       - name: daily_revenue
+        description: Sum of completed order amounts for the day, in USD.
         data_tests:
           - not_null

@@ -1,0 +1,12 @@
+{
+  "action": "pass",
+  "failures": [],
+  "unexpected_rows": [],
+  "failed_count": 0,
+  "critical_count": 0,
+  "success": true,
+  "rows": 600,
+  "data_path": "D:\\Folder F\\phamtuananh@23020010\\UET.iSEML\\2026.VinAI.Lab\\Track2\\Lab27\\data\\incoming\\orders.csv",
+  "quarantined_rows": 0,
+  "quarantine_path": null
+}

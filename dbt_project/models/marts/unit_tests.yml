@@ -1,0 +1,52 @@
+# dbt UNIT TESTS for fct_daily_revenue.
+#
+# Why these are unit tests and not data tests
+# -------------------------------------------
+# `not_null` / `unique` / `accepted_values` are DATA tests: they run against
+# whatever rows happen to be in the warehouse and assert a property of that
+# data. They can only fail once bad data has already arrived.
+#
+# A UNIT test asserts the TRANSFORMATION LOGIC on fixed, made-up input. It runs
+# without touching real data and fails the moment the SQL is wrong - even when
+# today's production data happens to be clean. The fan-out below is exactly that
+# case: the current customer seed has one active version per customer, so every
+# data test passes while the join is still latently broken.
+
+unit_tests:
+  - name: completed_orders_sum_to_expected_revenue
+    description: Baseline arithmetic - completed orders aggregate to one day.
+    model: fct_daily_revenue
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1, customer_id: C0001, amount_usd: 100.0, status: completed, order_date: '2026-08-01'}
+          - {order_id: 2, customer_id: C0001, amount_usd: 70.0, status: completed, order_date: '2026-08-01'}
+          # Non-completed rows must be excluded from revenue.
+          - {order_id: 3, customer_id: C0001, amount_usd: 999.0, status: pending, order_date: '2026-08-01'}
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: C0001, is_active: true, valid_from: '2026-01-01'}
+    expect:
+      rows:
+        - {order_date: '2026-08-01', completed_order_rows: 2, daily_revenue: 170.0}
+
+  - name: scd_fanout_does_not_inflate_revenue
+    description: >
+      The smallest fixture that exposes SCD-2 revenue inflation: ONE order and
+      TWO active versions of the same customer. Against the original model the
+      left join emitted the order twice, producing completed_order_rows = 2 and
+      daily_revenue = 200.0 from a single 100.0 order. The correct answer is one
+      row and 100.0 - revenue belongs to the order, not to the dimension.
+    model: fct_daily_revenue
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1, customer_id: C0001, amount_usd: 100.0, status: completed, order_date: '2026-08-01'}
+      - input: ref('stg_customers')
+        rows:
+          # A late-arriving update that never closed the previous version.
+          - {customer_id: C0001, is_active: true, valid_from: '2026-01-01'}
+          - {customer_id: C0001, is_active: true, valid_from: '2026-06-01'}
+    expect:
+      rows:
+        - {order_date: '2026-08-01', completed_order_rows: 1, daily_revenue: 100.0}

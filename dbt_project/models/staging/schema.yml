@@ -5,25 +5,64 @@ models:
     description: Cleaned order records used by downstream marts.
     columns:
       - name: order_id
+        description: Primary key. Duplicates double-count revenue downstream.
         data_tests:
           - not_null
           - unique
+
       - name: customer_id
+        description: Foreign key into stg_customers.
         data_tests:
           - not_null
+          # An order whose customer does not exist in the dimension is dropped
+          # or nulled by downstream joins, quietly shrinking revenue.
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+
+      - name: amount_usd
+        description: Order amount in USD.
+        data_tests:
+          - not_null
+
       - name: currency
         data_tests:
+          - not_null
           - accepted_values:
               arguments:
                 values: ['USD', 'VND']
+
       - name: status
         data_tests:
+          - not_null
           - accepted_values:
               arguments:
                 values: ['pending', 'completed', 'refunded', 'cancelled']
 
+      - name: created_at
+        data_tests:
+          - not_null
+
+      - name: updated_at
+        data_tests:
+          - not_null
+
+      - name: order_date
+        data_tests:
+          - not_null
+
   - name: stg_customers
+    description: Customer dimension (SCD-2 shaped; valid_to is null while current).
     columns:
       - name: customer_id
+        data_tests:
+          - not_null
+
+      - name: is_active
+        data_tests:
+          - not_null
+
+      - name: valid_from
         data_tests:
           - not_null
